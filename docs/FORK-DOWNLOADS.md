@@ -25,8 +25,14 @@ On a Mac, open the DMG and drag OpenBot to Applications. Open OpenBot from Appli
 On Windows, open the EXE and follow the installer steps.
 
 These builds are unsigned. macOS can block the first launch, and Windows can show an unknown
-publisher warning. Do not ask users to disable system security. Signed releases are needed for
-simple installation by users who cannot handle these warnings.
+publisher warning. An Apple Developer account and Windows signing credentials are not required
+to build or distribute these installers.
+
+If macOS blocks an installer from this fork, first check that you downloaded it from the fork's
+release page. After the blocked launch, open **System Settings > Privacy & Security**, find the
+OpenBot message, and select **Open Anyway**. Confirm the launch if prompted. See
+[Apple's instructions](https://support.apple.com/en-us/102445). A managed device can prevent this
+exception; contact its administrator in that case. Do not disable system security.
 
 The fork uses the OpenBot application name, install identity, and data folder. It can replace an
 existing OpenBot installation. Quit OpenBot before you install this fork. Do not run both versions
@@ -34,16 +40,18 @@ with the same data folder. The installer does not create a database backup.
 
 ## Publish a public download
 
-1. Set up signing accounts owned by this fork: Apple Developer ID with notarization, and Windows
-   code signing. Do not use the original project's account identifiers or signing secrets.
-2. Add a signed fork build configuration. Replace the Apple team identity and associated-domain
-   entitlement with values owned by this fork. Check invitation links and updates on real devices.
-3. Run the [release upgrade safety audit](../.agents/skills/release-upgrade-safety/SKILL.md).
-   Follow [the release checks](RELEASING.md) for the affected desktop targets. Do not run the
+1. Run the [release upgrade safety audit](../.agents/skills/release-upgrade-safety/SKILL.md).
+   Follow the applicable [release checks](RELEASING.md) for the affected desktop targets. This
+   fork uses unsigned installers instead of the original project's signed release process. Do not run the
    original production release workflow: it also deploys services owned by the original project.
-4. Build and check all three installers in GitHub Actions. Create a release in this fork and attach
-   the installers and checksums. Use release notes with one download link for each device type.
-5. Share the release link with users. GitHub public release downloads do not need a GitHub account.
+2. Build and check all three installers in GitHub Actions. Check installation and first launch on
+   real devices. Create a release in this fork and attach the installers and checksums. Use release
+   notes with one download link for each device type and the first-launch instructions above.
+3. Share the release link with users. GitHub public release downloads do not need a GitHub account.
+
+Signing is an optional improvement. It needs accounts owned by this fork: Apple Developer ID with
+notarization, and Windows code signing. A signed fork configuration must use its own Apple team
+identity and associated-domain entitlement. Do not use the original project's signing secrets.
 
 `electron-builder.fork.yml` sets the packaged update feed to this fork. It does not publish files.
 The build workflow has read-only repository access and does not create tags, releases, or deploy
