@@ -55,7 +55,7 @@ export const BILLING_PLANS: readonly BillingPlan[] = [
  * server keeps the limit that it had when the owner bought it.
  */
 export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {
-  starter: DEFAULT_TEAM_MEMBER_LIMIT,
+  starter: 3,
   standard: 10,
   pro: 25,
 };

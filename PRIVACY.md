@@ -1866,6 +1866,12 @@ host.
 
 ## iPhone notifications
 
+A member mention can notify the named person on desktop, web, and phone. The host sends a live event
+with the member, message, and chat IDs only to that person, while they can read the chat. The notice
+uses fixed text and follows their notification settings. Phone delivery uses the encrypted push path
+below. Its sealed data includes the channel ID when a tap must open a channel. The account service,
+Apple, and Google cannot read these IDs or the notification text.
+
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs
 an answer, an approval, or a step in the browser, while the app is not on screen. The host does not
 send one while the member uses a desktop app or the computer that it runs on. For this, it keeps in

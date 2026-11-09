@@ -39,4 +39,5 @@ export interface NotificationTarget {
   serverId: string | null;
   /** The thread of the event. A thread of a channel opens the channel. */
   threadId: string | null;
+  channelId?: string | null;
 }

@@ -62,6 +62,9 @@ function serializeNode(node: Node): string {
   if (attachmentId && attachmentName) {
     return serializeAttachmentReference(attachmentName, attachmentId);
   }
+  const memberId = node.dataset.memberId;
+  const memberName = node.dataset.memberName;
+  if (memberId && memberName) return serializeChatTagReference("member", memberName, memberId);
   const mentionId = node.dataset.mentionId;
   const mentionName = node.dataset.mentionName;
   if (mentionId && mentionName) return serializeChatTagReference("agent", mentionName, mentionId);
@@ -279,7 +282,7 @@ function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | 
   const element = node instanceof HTMLElement ? node : node.parentElement;
   const token =
     element?.closest<HTMLElement>(
-      "[data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id], [data-tab-id], [data-thread-id]",
+      "[data-member-id], [data-mention-id], [data-skill-id], [data-mcp-id], [data-quote-message-id], [data-tab-id], [data-thread-id]",
     ) ?? null;
   return token && editor.contains(token) ? token : null;
 }

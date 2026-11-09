@@ -713,6 +713,7 @@ function AgentTaskChat({
             />
           ) : (
             <ChatComposer
+              serverId={serverId}
               sendRetryVersion={0}
               replyTarget={null}
               replyFocusVersion={0}

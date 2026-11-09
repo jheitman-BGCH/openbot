@@ -148,4 +148,8 @@ export const messages = defineMessages("composer", {
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Closed browser tab {name}",
   "composer.token.unavailableThread": "Unavailable thread {name}",
+  "composer.picker.section.members": "People",
+  "composer.picker.badge.member": "Person",
+  "composer.token.member": "Person {name}",
+  "composer.picker.option.member": "{name} Person",
 });

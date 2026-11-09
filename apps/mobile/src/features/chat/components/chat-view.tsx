@@ -1304,6 +1304,7 @@ export function ChatView({
                 />
               ) : (
                 <ChatComposer
+                  serverId={target.serverId}
                   sendRetryVersion={sendRetryVersion}
                   replyTarget={replyTarget}
                   replyFocusVersion={replyFocusVersion}

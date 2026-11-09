@@ -44,6 +44,8 @@ const markdown = new Marked({
         // The phone cannot open the quoted passage, so a quote reads as its text in quotation marks.
         if (reference?.start === 0 && reference.kind === "quote")
           return { type: "text", raw: source.slice(0, reference.end), text: `“${reference.name}”` };
+        if (reference?.start === 0 && reference.kind === "member")
+          return { type: "text", raw: source.slice(0, reference.end), text: `@${reference.name}` };
         // A thread of the agent reads as its name.
         if (reference?.start === 0 && reference.kind === "thread")
           return { type: "text", raw: source.slice(0, reference.end), text: reference.name };

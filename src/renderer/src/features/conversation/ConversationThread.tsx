@@ -1,4 +1,5 @@
 import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { MEMBER_MENTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import { Input } from "@openbot/ui";
@@ -65,6 +66,12 @@ export function ConversationThread() {
     copiedMessageId,
     branchThread,
   } = useConversationViewScope();
+  const mentionMembers = () => {
+    const server = props.server;
+    if (server?.kind === "remote" && !server.compatibility?.capabilities.includes(MEMBER_MENTIONS_CAPABILITY))
+      return [];
+    return props.presence.members;
+  };
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   /** A failed answer shows here, where the person answered, and not in the agent's own chat. */
@@ -255,6 +262,7 @@ export function ConversationThread() {
             limit={current().threads.limit}
             agent={current().agent}
             agents={props.agents}
+            members={mentionMembers()}
             messages={messages}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}

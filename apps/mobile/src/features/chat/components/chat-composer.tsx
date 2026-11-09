@@ -13,6 +13,7 @@ import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import Square from "lucide-react-native/icons/square";
+import Users from "lucide-react-native/icons/users";
 import X from "lucide-react-native/icons/x";
 import { memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -48,6 +49,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import {
@@ -145,6 +147,7 @@ const PLACEHOLDER_OUT = FadeOut.duration(PLACEHOLDER_DURATION)
   .reduceMotion(ReduceMotion.System);
 
 interface ChatComposerProps {
+  serverId: string;
   sendLabel?: string;
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
@@ -226,7 +229,7 @@ export interface MentionSkill {
  * matches, as on the desktop.
  */
 export interface MentionReference {
-  kind: "tab" | "thread";
+  kind: "member" | "tab" | "thread";
   id: string;
   name: string;
   detail: string;
@@ -235,6 +238,7 @@ export interface MentionReference {
 
 /** The groups of the `@` list after the agents, in the desktop order: tabs and threads, then skills and apps. */
 const TAG_GROUPS = [
+  { kind: "member", title: "mobile.chat.composer.people", label: "mobile.chat.composer.mentionPerson", Icon: Users },
   { kind: "tab", title: "mobile.chat.composer.browserTabs", label: "mobile.chat.composer.browserTab", Icon: Globe },
   { kind: "thread", title: "mobile.chat.composer.threads", label: "mobile.chat.composer.thread", Icon: Link },
   { kind: "skill", title: "mobile.chat.composer.skills", label: "mobile.chat.composer.useSkill", Icon: Sparkles },
@@ -276,6 +280,7 @@ const FOCUS_RETRY_INTERVAL_MS = 100;
 const REPLY_KEYBOARD_WAIT_MS = 400;
 
 export const ChatComposer = memo(function ChatComposer({
+  serverId,
   sendLabel,
   action,
   actionForeground,
@@ -342,9 +347,17 @@ export const ChatComposer = memo(function ChatComposer({
     : [];
   // The limit comes after the rank, so it never cuts an agent whose name matches.
   const suggestions = query && !skillsOnly ? rankAgentMentions(mentionAgents, query.query).slice(0, 8) : [];
+  const members = useMobileWorkspaceSelector((workspace) => workspace.mentionMembersByServer[serverId]);
+  const memberReferences: MentionReference[] = (members ?? []).map((member) => ({
+    kind: "member",
+    id: member.id,
+    name: member.name?.trim() || member.email || member.username,
+    detail: member.username,
+    search: member.username,
+  }));
   const referenceSuggestions =
     query && !skillsOnly
-      ? mentionReferences
+      ? [...memberReferences, ...mentionReferences]
           .filter((reference) =>
             `${reference.name} ${reference.search}`.toLocaleLowerCase().includes(query.query.trim()),
           )

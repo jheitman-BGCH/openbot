@@ -147,6 +147,10 @@ import {
   type MachineAlertEvent,
   machineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  MEMBER_MENTIONS_CAPABILITY,
+  type MemberMentionEvent,
+} from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -1793,10 +1797,19 @@ try {
     json: { inviteToken: seatInvite.token, username: "carol", password: "carol-password-e2e" },
   });
   check(
-    "a fourth member is refused with memberLimit",
-    errorIs(fourth, 400, sourceText("error.team.memberLimit", { limit: 3 })) && store.listMembers().length === 3,
+    "a fourth member joins with an invitation",
+    fourth.status === 201 && store.listMembers().length === 4,
     summary(fourth),
   );
+  const carolId = field(fourth.body, "member", "id");
+  assert.ok(typeof carolId === "string", "carol did not join.");
+  await runCauseEffect(store.updateMember(carolId, { disabled: true }));
+  await runCauseEffect(store.updateMember(carolId, { disabled: false }));
+  check(
+    "a fourth member can be disabled and reactivated",
+    store.listMembers().length === 4 && store.listMembers().find((member) => member.id === carolId)?.disabled === false,
+  );
+  await runCauseEffect(store.removeMember(carolId));
 
   // ---- Sign-in, rate limit, account sign-in, logout ----
   {
@@ -4690,15 +4703,19 @@ try {
 
   // ---- A read mark change goes to the connections of its member only ----
   {
-    const openInvalidationSocket = async (token: string) => {
+    const openInvalidationSocket = async (token: string, mentionCapability?: boolean) => {
       const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
         TEAM_PROTOCOL_V1_WEBSOCKET,
         `openbot-token.${token}`,
       ]);
       const revisions: number[] = [];
+      const mentions: unknown[] = [];
+      const scopeReady = Promise.withResolvers<void>();
       const waiters = new Set<() => void>();
       socket.addEventListener("message", (message) => {
         const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "member-mentioned") mentions.push(value);
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") scopeReady.resolve();
         if (isDynamicRecord(value) && value.type === "conversation-invalidated" && typeof value.revision === "number") {
           revisions.push(value.revision);
           for (const wake of waiters) wake();
@@ -4708,6 +4725,25 @@ try {
         socket.addEventListener("open", () => resolveOpen(), { once: true });
         socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
       });
+      if (mentionCapability !== undefined) {
+        socket.send(
+          JSON.stringify({
+            type: "agent-event-scope",
+            includeConversations: false,
+            capabilities: [
+              TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
+              CHAT_COLORS_CAPABILITY,
+              ...(mentionCapability ? [MEMBER_MENTIONS_CAPABILITY] : []),
+            ],
+          }),
+        );
+        const timer = setTimeout(() => scopeReady.reject(new Error("The event scope did not become ready.")), 5000);
+        try {
+          await scopeReady.promise;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
       /** Whether the socket has the revision before the deadline. */
       const arrived = (revision: number) =>
         new Promise<boolean>((resolveArrived) => {
@@ -4724,12 +4760,50 @@ try {
           };
           waiters.add(wake);
         });
-      return { socket, revisions, arrived };
+      return { socket, revisions, mentions, arrived };
     };
     const emit = (revision: number, memberId?: string) => {
       for (const listener of agentEventListeners)
         listener({ type: "conversation-invalidated", agentId: "agent-ada", revision }, memberId);
     };
+    const mentionedDevice = await openInvalidationSocket(adaToken, true);
+    const otherDevice = await openInvalidationSocket(bobToken, true);
+    const olderDevice = await openInvalidationSocket(adaToken, false);
+    const mention: MemberMentionEvent = {
+      type: "member-mentioned",
+      memberId: adaId,
+      messageId: "member-mention-e2e",
+      agentId: "agent-ada",
+      channelId: null,
+      threadId: null,
+    };
+    for (const listener of agentEventListeners) listener(mention);
+    emit(90_600);
+    const delivered =
+      (await mentionedDevice.arrived(90_600)) &&
+      (await otherDevice.arrived(90_600)) &&
+      (await olderDevice.arrived(90_600));
+    check(
+      "a mention reaches only its member and only a client with member-mentions-v1",
+      delivered &&
+        isDeepStrictEqual(mentionedDevice.mentions, [mention]) &&
+        otherDevice.mentions.length === 0 &&
+        olderDevice.mentions.length === 0,
+      { target: mentionedDevice.mentions, other: otherDevice.mentions, older: olderDevice.mentions },
+    );
+    const previousAccess = accessLevels;
+    accessLevels = { ...previousAccess, everyone: { ...previousAccess.everyone, "agent-ada": "none" } };
+    const refusedMention = { ...mention, memberId: bobId };
+    for (const listener of agentEventListeners) listener(refusedMention);
+    emit(90_601);
+    await otherDevice.arrived(90_601);
+    check("a mention of a chat the member cannot read sends no notification", otherDevice.mentions.length === 0, {
+      events: otherDevice.mentions,
+    });
+    accessLevels = previousAccess;
+    mentionedDevice.socket.close();
+    otherDevice.socket.close();
+    olderDevice.socket.close();
     const adaDevice = await openInvalidationSocket(adaToken);
     const bobDevice = await openInvalidationSocket(bobToken);
     // The host adds a socket to its clients after the upgrade, so an event to all members shows when both are in.

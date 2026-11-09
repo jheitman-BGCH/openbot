@@ -371,7 +371,11 @@ export function QueuePanel(props: QueuePanelProps) {
     const text = expandAttachmentReferences(
       expandChatTagReferences(delivery.text.trim(), (reference) => {
         if (reference.kind === "quote") return `“${reference.name}”`;
-        return reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id);
+        return reference.kind === "agent"
+          ? agentNames.get(reference.id)
+          : reference.kind === "skill"
+            ? skillNames.get(reference.id)
+            : undefined;
       }),
     );
     return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || t("queue.attachment");

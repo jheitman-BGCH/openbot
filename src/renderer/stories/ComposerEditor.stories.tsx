@@ -157,7 +157,10 @@ const threads: ComposerThread[] = [
  * the composer. A compact composer holds the editor in the middle grid column, and the picker
  * stretches back out to the edges of the composer.
  */
-function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options: { width: string; compact?: boolean }) {
+function composerFrame(
+  storyArgs: Parameters<typeof ComposerEditor>[0],
+  options: { width: string; compact?: boolean; showDraft?: boolean },
+) {
   const [value, setValue] = createSignal(storyArgs.value);
   // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
   return (
@@ -165,6 +168,7 @@ function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options:
       class="composer-wrap"
       style={{ width: options.width, "max-width": "calc(100vw - 32px)", "margin-top": "260px" }}
     >
+      {options.showDraft ? <output aria-label="Draft text">{value()}</output> : null}
       <div class="composer" data-compact={options.compact ? "" : undefined}>
         <div class="composer-input-label">
           <ComposerEditor {...storyArgs} value={value()} onValueChange={setValue} onSubmit={storyArgs.onSubmit} />
@@ -331,4 +335,33 @@ export const WithTabAndThreadTags: Story = {
     value: `Compare ${serializeChatTagReference("tab", "Plans and pricing – Linear", "browser-tab-linear")} with ${serializeChatTagReference("thread", "Compare competitor pricing", "task-pricing")}, not ${serializeChatTagReference("tab", "Old page", "browser-tab-closed")} or ${serializeChatTagReference("thread", "Old thread", "task-deleted")}.`,
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px", compact: true }),
+};
+
+export const WithMemberMentions: Story = {
+  args: {
+    members: [
+      {
+        id: "person-research",
+        name: "Research",
+        username: "research-person",
+        email: "research@example.test",
+        avatarUrl: null,
+        role: "member",
+        createdAt: "2026-01-01T00:00:00Z",
+        disabled: false,
+      },
+      {
+        id: "person-ada",
+        name: "Ada",
+        username: "ada",
+        email: "ada@example.test",
+        avatarUrl: null,
+        role: "admin",
+        createdAt: "2026-01-01T00:00:00Z",
+        disabled: false,
+      },
+    ],
+    value: `${serializeChatTagReference("member", "Research", "person-research")} ask ${serializeChatTagReference("agent", "Research", "research")}. ${serializeChatTagReference("member", "Former member", "person-removed")}`,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px", showDraft: true }),
 };

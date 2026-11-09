@@ -1,10 +1,11 @@
 import { chatTagReferences, referenceName } from "@openbot/contracts/chat-tag-references";
-import type { DraftAttachment } from "@openbot/contracts/ipc";
+import type { DraftAttachment, TeamMemberSummary } from "@openbot/contracts/ipc";
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
 import { currentText } from "../../text";
+import { teamMemberName } from "../team/TeamPersonAvatar";
 import { appendAttachmentReferenceVisual } from "./AttachmentReference";
 import { tabTitle } from "./composer-picker";
 
@@ -104,6 +105,25 @@ export function syncAttachmentTokens(
     else if (attachment.name !== token.dataset.attachmentReferenceName)
       token.replaceWith(createAttachmentToken(attachment, actions));
   }
+}
+
+export function createMemberToken(
+  member: Pick<TeamMemberSummary, "id" | "name" | "email" | "username">,
+): HTMLSpanElement {
+  const name = teamMemberName(member);
+  const token = document.createElement("span");
+  token.className = `composer-mention-token ${referenceChipClasses.root}`;
+  token.contentEditable = "false";
+  token.dataset.kind = "member";
+  token.dataset.memberId = member.id;
+  token.dataset.memberName = name;
+  token.title = name;
+  token.setAttribute("aria-label", currentText().t("composer.token.member", { name }));
+  const label = document.createElement("span");
+  label.className = referenceChipClasses.name;
+  label.textContent = `@${name}`;
+  token.append(label);
+  return token;
 }
 
 export function createMentionToken(agent: ComposerAgent): HTMLSpanElement {
@@ -415,6 +435,7 @@ export function syncSkillTokens(editor: HTMLDivElement, skills: ComposerSkill[])
 /** What the editor draws its tags from. */
 export interface EditorTagSources {
   agents: ComposerAgent[];
+  members?: TeamMemberSummary[] | undefined;
   skills: ComposerSkill[];
   mcpServers: ComposerMcpServer[];
   attachments: DraftAttachment[];
@@ -437,6 +458,12 @@ export function renderEditorValue(
     const semanticReference = chatTagReferences(match[0])[0];
     const name = semanticReference?.name ?? match[1] ?? "Agent";
     const target = semanticReference ? `${semanticReference.kind}:${semanticReference.id}` : (match[2] ?? "");
+    if (semanticReference?.kind === "member") {
+      const member = sources.members?.find((candidate) => candidate.id === semanticReference.id);
+      editor.append(createMemberToken(member ?? { id: semanticReference.id, name, email: null, username: name }));
+      cursor = index + match[0].length;
+      continue;
+    }
     if (target.startsWith("attachment:")) {
       const id = target.slice("attachment:".length);
       const attachment = attachments.find((candidate) => candidate.id === id);

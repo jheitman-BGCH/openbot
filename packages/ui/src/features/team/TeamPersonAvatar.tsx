@@ -26,6 +26,6 @@ export function teamMemberSeed(member: TeamPresenceMember): string {
   return member.email ?? member.username ?? member.id;
 }
 
-export function teamMemberName(member: TeamPresenceMember): string {
+export function teamMemberName(member: Pick<TeamPresenceMember, "name" | "email" | "username">): string {
   return member.name?.trim() || member.email || member.username;
 }

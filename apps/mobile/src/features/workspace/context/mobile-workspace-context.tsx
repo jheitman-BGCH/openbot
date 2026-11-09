@@ -6,6 +6,7 @@ import {
   type RespondToApprovalInput,
   type SidebarLayoutSnapshot,
   type SidebarPin,
+  type TeamMemberSummary,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -47,6 +48,7 @@ import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MEMBER_MENTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -331,6 +333,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   useEffect(() => () => queryClient.removeQueries({ queryKey: queryKeys.chatQueue() }), [queryClient]);
   const presenceSignatures = useRef(new Map<string, string>());
+  const [mentionMembersByServer, setMentionMembersByServer] = useState<
+    Readonly<Record<string, readonly TeamMemberSummary[]>>
+  >({});
   const [memberCountByServer, setMemberCountByServer] = useState<Readonly<Record<string, number>>>({});
   if (!session) throw new Error("MobileWorkspaceProvider requires a signed-in mobile session.");
   const queryScope = useMemo<QueryScope>(
@@ -557,6 +562,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         keptCapabilities.current.delete(serverId);
         void workspaceCache?.remove(serverId).catch(() => undefined);
         presenceSignatures.current.delete(serverId);
+        setMentionMembersByServer((current) => {
+          const next = { ...current };
+          delete next[serverId];
+          return next;
+        });
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
           queryKeys.serverMembers(queryScope, serverId),
@@ -1558,10 +1568,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return;
       if (event.type === "team-presence") {
         const signature = JSON.stringify(
-          event.snapshot.members.map((member) => [member.id, member.role, member.disabled, member.online]),
+          event.snapshot.members.map((member) => [
+            member.id,
+            member.name,
+            member.email,
+            member.username,
+            member.role,
+            member.disabled,
+            member.online,
+          ]),
         );
         if (presenceSignatures.current.get(serverId) !== signature) {
           presenceSignatures.current.set(serverId, signature);
+          setMentionMembersByServer((current) => ({
+            ...current,
+            [serverId]: hasCapability(serverCapabilities.current, serverId, MEMBER_MENTIONS_CAPABILITY)
+              ? event.snapshot.members.filter((member) => !member.disabled)
+              : [],
+          }));
           const members = event.snapshot.members.filter((member) => !member.disabled).length;
           setMemberCountByServer((current) =>
             current[serverId] === members ? current : { ...current, [serverId]: members },
@@ -2406,6 +2430,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       sidebarByServer,
       servers: orderedServers,
       memberCountByServer,
+      mentionMembersByServer,
       serverDirectoryState,
       serverDirectoryError,
       agents,
@@ -2514,6 +2539,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     sidebarByServer,
     orderedServers,
     memberCountByServer,
+    mentionMembersByServer,
     serverDirectoryState,
     serverDirectoryError,
     agents,

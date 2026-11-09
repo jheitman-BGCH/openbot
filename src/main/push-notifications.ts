@@ -14,6 +14,10 @@ import {
   type NotificationSound,
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  MEMBER_MENTIONS_CAPABILITY,
+  type MemberMentionEvent,
+} from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { redactText, toLogValue } from "@openbot/logging";
 import {
@@ -88,6 +92,12 @@ interface PushNotificationOptions {
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, memberId: string): ReadonlySet<string>;
   /** Whether the member is still a member and not disabled. A removed member gets no more notifications. */
   memberActive(memberId: string): boolean;
+  canReceiveMention?(
+    event: MemberMentionEvent,
+    memberId: string,
+    protocol: number,
+    capabilities: ReadonlySet<string>,
+  ): boolean;
   /** The last send, answer or typing of the member in a session other than this phone, or `null`. */
   lastUseElsewhere(memberId: string, sessionId: string): number | null;
   /** How long after the last use of the member elsewhere the phone notifies. `DESKTOP_USE_MS` when not set. */
@@ -307,6 +317,10 @@ export class PushNotificationService {
     received: AgentEvent,
     only?: Registration,
   ) {
+    if (received.type === "member-mentioned") {
+      yield* this.#deliverMention(received, only);
+      return;
+    }
     // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
     const routineTaskId = received.type === "routine-thread-turn-completed" ? received.taskId : null;
     const event = received.type === "routine-thread-turn-completed" ? received.turn : received;
@@ -389,6 +403,49 @@ export class PushNotificationService {
       // A failed send waits before it goes again, so each send has its own fiber: the other phones
       // do not wait for it.
       yield* this.#send(registration, content, fixed.body).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
+    }
+  });
+
+  #deliverMention = Effect.fn("PushNotifications.deliverMention")(function* (
+    this: PushNotificationService,
+    event: MemberMentionEvent,
+    only?: Registration,
+  ) {
+    const now = this.#now();
+    for (const registration of only ? [only] : this.#registrations.values()) {
+      const { memberId, sessionId, protocol, value } = registration.stored;
+      if (
+        !registration.capabilities.has(MEMBER_MENTIONS_CAPABILITY) ||
+        memberId !== event.memberId ||
+        !this.#options.memberActive(memberId) ||
+        !this.#options.canReceiveMention?.(event, memberId, protocol, registration.capabilities)
+      )
+        continue;
+      if (value.mutedUntil !== null && value.mutedUntil * 1000 > now) continue;
+      if (!value.away && registration.connected) {
+        if (!only) this.#hold(registration, event, now);
+        continue;
+      }
+      const used = this.#lastUseElsewhere(memberId, sessionId);
+      if ((used !== null && now - used < this.#awayAfterMs) || this.#options.atHostComputer(memberId, event)) continue;
+      if (registration.stored.platform !== "android" && value.token === null) continue;
+      const levels = this.#options.memberLevels?.(memberId);
+      const level = agentNotificationLevel(levels?.server ?? value.level, levels?.agents ?? null, event.agentId);
+      const translate = translateFor(resolveLocale("system", value.locale));
+      const notice = notificationForAgentEvent(event, [], translate, level);
+      if (!notice) continue;
+      const content: PushNotificationContent = {
+        serverId: value.serverId,
+        agentId: notice.agentId,
+        threadId: notice.threadId,
+        kind: "input",
+        title: notice.title,
+        body: notice.body,
+        ...(event.channelId ? { channelId: event.channelId } : {}),
+      };
+      yield* this.#send(registration, content, notice.body).pipe(
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      );
     }
   });
 

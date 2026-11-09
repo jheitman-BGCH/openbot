@@ -39,4 +39,6 @@ export const messages = defineMessages("notification", {
   // The toast region in each window.
   "notification.toast.region": "Notifications",
   "notification.toast.close": "Close notification",
+  "notification.mentioned.title": "You were mentioned",
+  "notification.mentioned.body": "Someone mentioned you in a chat.",
 });

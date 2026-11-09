@@ -136,6 +136,12 @@ export function createRendererForwarders({
   }
 
   function forwardAgentEvent(serverId: string, event: AgentEvent, bufferedLive = false): void {
+    if (
+      event.type === "member-mentioned" &&
+      serverId === LOCAL_SERVER_ID &&
+      !getHostService()?.memberMentionForCurrentUser(event)
+    )
+      return;
     if (serverId === LOCAL_SERVER_ID) getHostAnalytics()?.handleAgentEvent(event);
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;

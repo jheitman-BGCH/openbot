@@ -23,6 +23,7 @@ export interface PushNotificationContent {
   serverId: string;
   agentId: string;
   threadId: string | null;
+  channelId?: string;
   kind: PushNotificationKind;
   title: string;
   body: string;

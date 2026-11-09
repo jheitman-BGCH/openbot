@@ -35,6 +35,7 @@ import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sideb
 import { isSidebarPinsSnapshot, type SidebarPin } from "./ipc-sidebar-pins";
 import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { type MemberMentionEvent, memberMentionEvent } from "./team-protocol/member-mentions-v1";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
@@ -88,6 +89,7 @@ export interface AgentTurnCompletedEvent {
 }
 
 export type AgentEvent =
+  | MemberMentionEvent
   | { type: "channels-changed"; channelId: string; revision: number }
   | { type: "status"; status: AgentStatus }
   | { type: "usage-changed"; usage: AccountUsage }
@@ -261,6 +263,13 @@ export type AgentEvent =
 
 export function isAgentEvent(value: unknown): value is AgentEvent {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
+  if (value.type === "member-mentioned") {
+    try {
+      return memberMentionEvent(value) !== null;
+    } catch {
+      return false;
+    }
+  }
   switch (value.type) {
     case "channels-changed":
       return (

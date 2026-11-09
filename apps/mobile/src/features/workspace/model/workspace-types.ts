@@ -132,6 +132,7 @@ import type {
   SignInRelayStatus,
   StartWhatsAppLinkInput,
   StorageUsage,
+  TeamMemberSummary,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
@@ -361,6 +362,7 @@ export interface MobileWorkspaceContextValue {
    * has sent no presence yet has no entry. The account service member list is not read for it.
    */
   memberCountByServer: Readonly<Record<string, number>>;
+  mentionMembersByServer: Readonly<Record<string, readonly TeamMemberSummary[]>>;
   teamDirectory: RemoteTeamDirectoryClient;
   serverDirectoryState: MobileServerDirectoryState;
   serverDirectoryError: string | null;
@@ -1129,6 +1131,7 @@ type MobileWorkspaceStateKey =
   | "sidebarByServer"
   | "servers"
   | "memberCountByServer"
+  | "mentionMembersByServer"
   | "serverDirectoryState"
   | "serverDirectoryError"
   | "agents"

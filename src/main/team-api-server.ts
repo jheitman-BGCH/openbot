@@ -166,6 +166,10 @@ import {
   type MachineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
+import {
+  MEMBER_MENTIONS_CAPABILITY,
+  type MemberMentionEvent,
+} from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import {
@@ -444,6 +448,32 @@ export class TeamApiServer {
   readonly #sessionUse = new Map<string, { memberId: string; at: number }>();
   /** When the focus period of each session started, and its last focus ping. Push notifications do not read it. */
   readonly #sessionFocus = new Map<string, { since: number; at: number }>();
+  canReceiveMemberMention(
+    event: MemberMentionEvent,
+    memberId: string,
+    protocol: number,
+    capabilities: ReadonlySet<string>,
+  ): boolean {
+    if (event.memberId !== memberId) return false;
+    const member = this.#options.store.getMember(memberId);
+    if (!member || member.disabled) return false;
+    const hidden = this.hiddenAgentIds(protocol, capabilities, member);
+    if (event.agentId !== null && hidden.has(event.agentId)) return false;
+    if (event.channelId !== null) {
+      const channels = this.#options.channels;
+      if (!channels?.store.exists(event.channelId)) return false;
+      const channel = channels.store.get(event.channelId);
+      if (channel.archived) return false;
+      if (
+        !canAdministerServer(member.role) &&
+        channel.members.length &&
+        !channel.members.some((item) => !hidden.has(item.agentId))
+      )
+        return false;
+    }
+    return true;
+  }
+
   #agentListener: ((event: AgentEvent, memberId?: string) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #stopAgentAccessListener: (() => void) | null = null;
@@ -1533,6 +1563,16 @@ export class TeamApiServer {
     for (const [client, connection] of this.#eventClients) {
       if (memberId !== undefined && connection.memberId !== memberId) continue;
       const event = this.#eventFor(connection, broadcast);
+      if (
+        event.type === "member-mentioned" &&
+        !this.canReceiveMemberMention(
+          event,
+          connection.memberId,
+          eventProtocol(connection.capabilities),
+          connection.capabilities,
+        )
+      )
+        continue;
       // Only accounts after the first: a client reads an empty reading as no provider reporting.
       if (event !== broadcast && event.type === "usage-changed" && event.usage.limits.length === 0) continue;
       if (event.type === "conversation") {
@@ -2640,6 +2680,7 @@ function optionalEventAgentId(event: OptionalTeamEvent): string | null {
 }
 
 function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
+  if (event.type === "member-mentioned") return MEMBER_MENTIONS_CAPABILITY;
   if (
     event.type === "channels-changed" ||
     event.type === "channel-memories-changed" ||

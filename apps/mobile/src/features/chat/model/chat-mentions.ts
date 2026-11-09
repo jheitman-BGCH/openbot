@@ -66,7 +66,7 @@ export function insertMention(
   source: string,
   range: { start: number; end: number },
   agent: { id: string; name: string },
-  kind: "agent" | "skill" | "mcp" | "tab" | "thread" = "agent",
+  kind: "agent" | "member" | "skill" | "mcp" | "tab" | "thread" = "agent",
 ) {
   const wireOffset = (position: number) => {
     let offset = position;

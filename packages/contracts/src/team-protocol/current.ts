@@ -85,6 +85,7 @@ import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { MEMBER_MENTIONS_CAPABILITY } from "./member-mentions-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
@@ -336,6 +337,7 @@ export {
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
+  MEMBER_MENTIONS_CAPABILITY,
   BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V9_CAPABILITIES,
   "remote-desktop-setup",
@@ -629,6 +631,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
     capability !== MEMORY_REVIEW_CAPABILITY &&
+    capability !== MEMBER_MENTIONS_CAPABILITY &&
     capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
     capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&
@@ -686,6 +689,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  MEMBER_MENTIONS_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
@@ -824,6 +828,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
       capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
       capability !== MEMORY_REVIEW_CAPABILITY &&
+      capability !== MEMBER_MENTIONS_CAPABILITY &&
       capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
       capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&

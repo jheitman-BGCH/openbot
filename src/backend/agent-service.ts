@@ -261,6 +261,7 @@ import type { MailboxStore } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
+import { memberMentionEvents } from "./member-mentions";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
@@ -1379,6 +1380,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#routineTimer.arm();
         this.#emit({ type: "channels-changed", channelId, revision });
       },
+      mentioned: (event) => this.#emit(event, event.memberId),
       memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
       ...(options.channelPersonAgentLevel ? { personAgentLevel: options.channelPersonAgentLevel } : {}),
       ...(options.channelRemotePerson ? { remotePerson: options.channelRemotePerson } : {}),
@@ -5622,6 +5624,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!task) {
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       this.#conversation.emitConversation(snapshot);
+    }
+    if (!welcome) {
+      for (const event of memberMentionEvents(input.text, sender?.id, {
+        messageId: receipt.messageId,
+        agentId: agent.id,
+        channelId: null,
+        threadId: targetThreadId,
+      }))
+        this.#emit(event, event.memberId);
     }
     this.#mailboxSync.emitQueue(agent.id);
     this.#usageLimits.retry(agent.id);

@@ -227,3 +227,28 @@ describe("decodeScopedAgentEvent", () => {
     expect(() => decodeScopedAgentEvent(value)).toThrow(/^Invalid /);
   });
 });
+
+describe("member mention events from main", () => {
+  const mention = {
+    type: "member-mentioned",
+    memberId: "member-1",
+    messageId: "message-1",
+    agentId: null,
+    channelId: "channel-1",
+    threadId: null,
+  } as const;
+  it("keeps the recipient and channel needed to open a mention", () => {
+    const scoped = { serverId: "server-1", event: mention };
+    expect(decodeScopedAgentEvent(scoped)).toEqual(scoped);
+  });
+  it.each([
+    { ...mention, memberId: "" },
+    { ...mention, memberId: "x".repeat(257) },
+    { ...mention, messageId: 7 },
+    { ...mention, channelId: null },
+    { ...mention, agentId: {} },
+    { ...mention, threadId: [] },
+  ])("rejects a malformed mention before the renderer reads it", (event) => {
+    expect(() => decodeScopedAgentEvent({ serverId: "server-1", event })).toThrow("Invalid agent event.");
+  });
+});

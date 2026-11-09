@@ -15,6 +15,7 @@ import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
+import { type MemberMentionEvent, memberMentionEvent } from "./member-mentions-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
@@ -37,6 +38,7 @@ export type OptionalTeamEvent =
   | ChannelEvent
   | HostRestartEvent
   | LiveVoiceEvent
+  | MemberMentionEvent
   | MachineAlertEvent
   | SidebarPinsEvent
   | SidebarFoldersEvent
@@ -70,6 +72,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     channelEvent(value) ??
     hostRestartEvent(value) ??
     liveVoiceEvent(value) ??
+    memberMentionEvent(value) ??
     machineAlertEvent(value) ??
     sidebarPinsEvent(value) ??
     sidebarFoldersEvent(value) ??

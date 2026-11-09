@@ -1,4 +1,5 @@
 import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { MEMBER_MENTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -45,6 +46,12 @@ export function ConversationSideThread(props: { threadId: string }) {
     copiedMessageId,
     branchThread,
   } = useConversationViewScope();
+  const mentionMembers = () => {
+    const server = view.server;
+    if (server?.kind === "remote" && !server.compatibility?.capabilities.includes(MEMBER_MENTIONS_CAPABILITY))
+      return [];
+    return view.presence.members;
+  };
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -167,6 +174,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}
+            members={mentionMembers()}
             messages={messages}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}

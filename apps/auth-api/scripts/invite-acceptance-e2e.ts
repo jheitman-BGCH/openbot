@@ -142,6 +142,49 @@ async function aNewMemberJoins() {
   check("a join uses the permanent link once", invite(link.inviteId).useCount === 1, invite(link.inviteId));
 }
 
+async function moreThanThreeMembersJoin() {
+  const { database, now, plane, createInvite } = await setup();
+  const link = await createInvite("member", true);
+  const joined: { user: AuthUser; membershipId: string }[] = [];
+  for (let index = 0; index < 4; index += 1) {
+    const user: AuthUser = {
+      ...MEMBER,
+      id: `user-extra-${index}`,
+      email: `extra-${index}@example.test`,
+    };
+    database
+      .prepare("INSERT INTO users(id, identity_key, email, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(user.id, `email:${user.email}`, user.email, user.name, now, now);
+    const accepted = await failureCode(plane.acceptInvite(user, link.token));
+    check(`invited member ${index + 1} joins next to the owner`, accepted.code === null, accepted);
+    const row = database
+      .prepare("SELECT membership_id FROM remote_memberships WHERE host_id = ? AND user_id = ?")
+      .get(HOST_ID, user.id);
+    if (!row) throw new Error("The member did not join.");
+    joined.push({ user, membershipId: String(row.membership_id) });
+  }
+  const activeCount = () =>
+    Number(
+      database
+        .prepare("SELECT COUNT(*) AS count FROM remote_memberships WHERE host_id = ? AND status = 'active'")
+        .get(HOST_ID)?.count,
+    );
+  check("the server has five active members", activeCount() === 5, { count: activeCount() });
+  const member = joined[3];
+  if (!member) throw new Error("The fourth invited member did not join.");
+  await Effect.runPromise(
+    plane.changeMembership(OWNER.id, { hostId: HOST_ID, membershipId: member.membershipId, revoke: true }),
+  );
+  const reactivated = await failureCode(
+    plane.changeMembership(OWNER.id, { hostId: HOST_ID, membershipId: member.membershipId, reactivate: true }),
+  );
+  check("a member can be reactivated above three active members", reactivated.code === null && activeCount() === 5, {
+    code: reactivated.code,
+    count: activeCount(),
+  });
+  database.close();
+}
+
 async function aMemberAcceptsAgain() {
   const { plane, epoch, membership, invite, openSessions, openSession, createInvite } = await setup();
   const link = await createInvite("member", true);
@@ -257,6 +300,7 @@ async function singleUseCapHolds() {
 
 const scenarios = [
   aNewMemberJoins,
+  moreThanThreeMembersJoin,
   aMemberAcceptsAgain,
   anAdminKeepsTheRole,
   aRemovedMemberStaysRemoved,

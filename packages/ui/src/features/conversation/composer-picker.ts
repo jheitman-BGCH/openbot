@@ -1,9 +1,10 @@
-import type { DraftAttachment } from "@openbot/contracts/ipc";
+import type { DraftAttachment, TeamMemberSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Bot, File, Folder, Plug, type Puzzle, ShieldCheck, Store, UsersRound } from "@openbot/ui";
 import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
 import type { TextValue } from "../../text";
 import { browserDisplayUrl } from "../browser/browser-suggestions";
+import { teamMemberName } from "../team/TeamPersonAvatar";
 
 /**
  * Where the picker hangs, and from which element. Like the queue panel, it is a child of
@@ -18,6 +19,7 @@ export interface PickerFrame {
 
 export type PickerOption =
   | { type: "agent"; agent: ComposerAgent }
+  | { type: "member"; member: TeamMemberSummary }
   /** Addresses every member of a channel. It inserts the text `@everyone`. */
   | { type: "everyone" }
   /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
@@ -41,6 +43,7 @@ export interface PickerSection {
 
 export function pickerOptionKey(option: PickerOption): string {
   if (option.type === "agent") return `agent:${option.agent.id}`;
+  if (option.type === "member") return `member:${option.member.id}`;
   if (option.type === "everyone") return "everyone";
   if (option.type === "skill") return `skill:${option.skill.skillId}`;
   if (option.type === "tab") return `tab:${option.tab.id}`;
@@ -50,6 +53,7 @@ export function pickerOptionKey(option: PickerOption): string {
 
 export function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
   if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
+  if (option.type === "member") return t("composer.picker.option.member", { name: teamMemberName(option.member) });
   if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") {
     const name = option.showSlug ? `${option.skill.name} ${option.skill.slug}` : option.skill.name;
@@ -64,6 +68,7 @@ export function pickerOptionText(option: PickerOption, t: TextValue["t"]): strin
 
 export function pickerOptionName(option: PickerOption, t: TextValue["t"]): string {
   if (option.type === "agent") return option.agent.name;
+  if (option.type === "member") return teamMemberName(option.member);
   if (option.type === "everyone") return t("composer.picker.everyone");
   if (option.type === "skill") return option.skill.name;
   if (option.type === "tab") return tabTitle(option.tab);
@@ -76,6 +81,7 @@ export function pickerOptionDescription(
   t: TextValue["t"],
   format: TextValue["format"],
 ): string | undefined {
+  if (option.type === "member") return option.member.username;
   if (option.type === "everyone") return t("composer.picker.everyoneDescription");
   if (option.type === "attachment") return format.fileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
@@ -147,6 +153,7 @@ export function pickerOptionBadge(
   // The section title says that a row is a tab, so a tab row needs no badge.
   if (option.type === "tab") return null;
   if (option.type === "thread") return { label: t(THREAD_STATE_LABELS[threadStateLabel(option.thread)]) };
+  if (option.type === "member") return { label: t("composer.picker.badge.member"), icon: UsersRound };
   if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
   if (option.type === "everyone") return { label: t("composer.picker.badge.channel"), icon: UsersRound };
   if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };

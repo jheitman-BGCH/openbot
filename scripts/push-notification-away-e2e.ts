@@ -15,15 +15,21 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import { MEMBER_MENTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { createOpenBotLogger } from "@openbot/logging";
 import { encodeLiveActivityBytes, LIVE_ACTIVITY_SECRET_BYTES } from "@openbot/team-client/live-activity-seal";
 import { pushNotificationKeys } from "@openbot/team-client/push-notification-seal";
 import { Effect } from "effect";
 import { openSealedLiveActivity } from "../apps/mobile/src/features/live-activity/model/live-activity-open";
+import { ChannelImages } from "../src/backend/channel-images";
+import { ChannelService } from "../src/backend/channel-service";
+import { MailboxStore } from "../src/backend/mailbox-store";
+import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { LiveActivityPushService } from "../src/main/live-activity-push";
 import {
   type NotificationRelayRequest,
@@ -58,6 +64,8 @@ const sent: NotificationRelayRequest[] = [];
 const activityPushes: LiveActivityRelayPush[] = [];
 const waiters = new Set<() => void>();
 let failNextSend = false;
+let mentionAllowed = true;
+let mentionLevel: "all" | "needs-me" | "nothing" = "all";
 
 function agentSummary(id: string): AgentSummary {
   return {
@@ -153,6 +161,8 @@ const phones = new PushNotificationService({
       return Effect.succeed("sent" as const);
     }),
   hiddenAgentIds: () => new Set(),
+  canReceiveMention: () => mentionAllowed,
+  memberLevels: () => ({ server: mentionLevel, agents: new Map() }),
   memberActive: (memberId) => memberId === MEMBER,
   lastUseElsewhere: () => null,
   atHostComputer: () => false,
@@ -181,10 +191,14 @@ function opened(request: NotificationRelayRequest): string {
   return `${content.kind} ${content.agentId}`;
 }
 
-function registerAndroid(away: boolean): void {
+function registerAndroid(away: boolean, mentions = false): void {
   phones.register(
     ANDROID,
-    { memberId: MEMBER, protocol: 7, capabilities: new Set() },
+    {
+      memberId: MEMBER,
+      protocol: mentions ? 9 : 7,
+      capabilities: new Set(mentions ? [MEMBER_MENTIONS_CAPABILITY] : []),
+    },
     {
       platform: "android",
       value: {
@@ -271,6 +285,109 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
 let passed = false;
 try {
   phones.start();
+  await step("member mentions respect the recipient, access, mute, and encryption", async () => {
+    registerAndroid(true, true);
+    mentionLevel = "needs-me";
+    const from = sent.length;
+    const mention = {
+      type: "member-mentioned" as const,
+      memberId: MEMBER,
+      messageId: "mention-message",
+      agentId: null,
+      channelId: "mentioned-channel",
+      threadId: null,
+    };
+    events.emit("event", { ...mention, memberId: "someone-else" });
+    mentionAllowed = false;
+    events.emit("event", mention);
+    mentionAllowed = true;
+    mentionLevel = "nothing";
+    events.emit("event", mention);
+    mentionLevel = "needs-me";
+    mkdirSync(OUT, { recursive: true });
+    const data = mkdtempSync(join(OUT, "member-channel-"));
+    const database = new OpenBotDatabase(data);
+    const mailbox = new MailboxStore(data, join(data, "shared"), database);
+    await Effect.runPromise(mailbox.initialize());
+    let generated = 0;
+    const failures: unknown[] = [];
+    const channels = new ChannelService(database, mailbox, new ChannelImages(join(data, "images")), {
+      agents: () => [{ ...agentSummary(AGENT_A), name: "Ada" }],
+      generate: () => {
+        generated++;
+        return Effect.succeed("{}");
+      },
+      schedule: () => {
+        generated++;
+      },
+      interrupt: () => Effect.void,
+      busy: () => false,
+      changed: () => {},
+      mentioned: (event) => events.emit("event", event),
+      error: (error) => failures.push(error),
+    });
+    const actor = { id: "sender", name: "Sender" };
+    const channelId = mention.channelId;
+    try {
+      await Effect.runPromise(
+        channels.command(
+          {
+            type: "save",
+            operationId: "create-mention-channel",
+            channelId,
+            draft: {
+              name: "Review",
+              title: "",
+              instructions: "",
+              members: [{ agentId: AGENT_A }],
+              leadAgentId: AGENT_A,
+            },
+          },
+          actor,
+        ),
+      );
+      const tag = serializeChatTagReference("member", "Ada", MEMBER);
+      const ownTag = serializeChatTagReference("member", "Sender", actor.id);
+      const text = `${tag} ${tag} ${ownTag} please review`;
+      const command = {
+        type: "send" as const,
+        operationId: "send-mention",
+        channelId,
+        text,
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      };
+      await Effect.runPromise(channels.command(command, actor));
+      await Effect.runPromise(channels.command(command, actor));
+      const messages = channels.store.messages(channelId).filter((entry) => entry.author.kind === "member");
+      assert.equal(messages.length, 1, "A retry must not repeat the message.");
+      assert.equal(messages[0]?.message.text, text, "The stored message must keep member identities.");
+      assert.equal(channels.store.tasks(channelId).length, 0, "A message to people must start no agent task.");
+      assert.equal(generated, 0, "An agent with the same name as a person must get no work.");
+      assert.deepEqual(failures, []);
+    } finally {
+      await Effect.runPromise(channels.stop());
+      database.close();
+    }
+    const said = await sendsUntil(ANDROID, from, "input ");
+    assert.deepEqual(said, ["input "]);
+    const request = sent[from];
+    assert.ok(request);
+    const keys = pushNotificationKeys(secrets.get(ANDROID) ?? new Uint8Array());
+    const plain = openSealedLiveActivity(
+      request.push.sealed,
+      encodeLiveActivityBytes(keys.seal),
+      encodeLiveActivityBytes(keys.tag),
+    );
+    assert.ok(plain);
+    const content = JSON.parse(plain);
+    assert.equal(content.channelId, "mentioned-channel");
+    assert.equal(content.title, "You were mentioned");
+    assert.equal(content.body, "Someone mentioned you in a chat.");
+    mentionLevel = "all";
+    return { sent: said, channelId: content.channelId };
+  });
 
   await step("an unread reply that came while the phone looked on screen goes out when its path fails", async () => {
     registerAndroid(false);
@@ -341,7 +458,11 @@ try {
   await step("a Live Activity replaces the notification only of an event that it shows", async () => {
     phones.register(
       IPHONE,
-      { memberId: MEMBER, protocol: 7, capabilities: new Set() },
+      {
+        memberId: MEMBER,
+        protocol: 7,
+        capabilities: new Set(),
+      },
       {
         value: {
           serverId: "fixture-server",

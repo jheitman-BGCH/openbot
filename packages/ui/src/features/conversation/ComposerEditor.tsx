@@ -2,7 +2,7 @@ import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { EVERYONE_MENTION, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { DraftAttachment } from "@openbot/contracts/ipc";
+import type { DraftAttachment, TeamMemberSummary } from "@openbot/contracts/ipc";
 import { AppWindow, Badge, Blocks, Listbox, Puzzle, Split, UsersRound } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { Dynamic, Portal } from "@solidjs/web";
@@ -20,6 +20,7 @@ import {
 import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkill, ComposerThread } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { teamMemberName } from "../team/TeamPersonAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual } from "./AttachmentReference";
 import {
@@ -58,6 +59,7 @@ import {
   type AttachmentTokenActions,
   createAttachmentToken,
   createMcpToken,
+  createMemberToken,
   createMentionToken,
   createQuoteToken,
   createSkillToken,
@@ -83,6 +85,7 @@ import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 interface ComposerEditorProps {
   agentId: string | undefined;
   agents: ComposerAgent[];
+  members?: TeamMemberSummary[] | undefined;
   skills?: ComposerSkill[] | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
@@ -208,6 +211,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const others = props.agents.filter((agent) => agent.id !== props.agentId);
     return rankAgentMentions(others, mention()?.query ?? "");
   });
+  const matchingMembers = createMemo(() => {
+    const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
+    return (props.members ?? []).filter(
+      (member) =>
+        !member.disabled && `${teamMemberName(member)} ${member.username}`.toLocaleLowerCase().includes(query),
+    );
+  });
   const matchesEveryone = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     if (!props.everyoneMention) return false;
@@ -280,6 +290,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
       ].filter((section) => section.options.length > 0);
     if (trigger !== "@") return [];
     const sections: PickerSection[] = [
+      {
+        id: "members",
+        title: "composer.picker.section.members",
+        options: matchingMembers().map((member) => ({ type: "member" as const, member })),
+      },
       {
         id: "agents",
         title: "composer.picker.section.agents",
@@ -393,6 +408,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       agentId: props.agentId,
       value: props.value,
       agents: props.agents,
+      members: props.members ?? [],
       skills: props.skills ?? [],
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
@@ -407,6 +423,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       agentId,
       value,
       agents,
+      members,
       skills,
       mcpServers,
       attachments,
@@ -468,7 +485,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         renderEditorValue(
           editor,
           value,
-          { agents, skills, mcpServers, attachments, browserTabs, threads },
+          { agents, members, skills, mcpServers, attachments, browserTabs, threads },
           attachmentTokenActions,
         );
         setMention(null);
@@ -521,6 +538,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       shown: dictating(),
       value: props.value,
       agents: props.agents,
+      members: props.members ?? [],
       skills: props.skills ?? [],
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
@@ -610,6 +628,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   function tagSources(): EditorTagSources {
     return {
       agents: props.agents,
+      members: props.members ?? [],
       skills: props.skills ?? [],
       mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
@@ -705,19 +724,21 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (!range) return;
     range.deleteContents();
     const token =
-      option.type === "agent"
-        ? createMentionToken(option.agent)
-        : option.type === "everyone"
-          ? document.createTextNode(EVERYONE_MENTION)
-          : option.type === "skill"
-            ? createSkillToken(option.skill)
-            : option.type === "mcp"
-              ? createMcpToken(option.server)
-              : option.type === "tab"
-                ? createTabToken(option.tab)
-                : option.type === "thread"
-                  ? createThreadToken(option.thread)
-                  : createAttachmentToken(option.attachment, attachmentTokenActions);
+      option.type === "member"
+        ? createMemberToken(option.member)
+        : option.type === "agent"
+          ? createMentionToken(option.agent)
+          : option.type === "everyone"
+            ? document.createTextNode(EVERYONE_MENTION)
+            : option.type === "skill"
+              ? createSkillToken(option.skill)
+              : option.type === "mcp"
+                ? createMcpToken(option.server)
+                : option.type === "tab"
+                  ? createTabToken(option.tab)
+                  : option.type === "thread"
+                    ? createThreadToken(option.thread)
+                    : createAttachmentToken(option.attachment, attachmentTokenActions);
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
@@ -1195,7 +1216,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     >
                       {option.type === "agent" ? (
                         <AgentAvatar agent={option.agent} />
-                      ) : option.type === "everyone" ? (
+                      ) : option.type === "everyone" || option.type === "member" ? (
                         <span class="mention-picker-skill-icon" aria-hidden="true">
                           <UsersRound />
                         </span>

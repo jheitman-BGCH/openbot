@@ -1,7 +1,7 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote } from "@openbot/ui";
+import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote, UsersRound } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -61,7 +61,7 @@ const UNAVAILABLE_TAG_LABELS = {
  * keeps the name it had when the message was sent, as an MCP server does: the message records what
  * the user asked.
  */
-type UnavailableTagKind = Exclude<ChatTagKind, "quote" | "tab" | "thread">;
+type UnavailableTagKind = Exclude<ChatTagKind, "member" | "quote" | "tab" | "thread">;
 
 export function RichMessageText(props: RichMessageTextProps) {
   const { t } = useText();
@@ -183,6 +183,16 @@ export function RichMessageText(props: RichMessageTextProps) {
                 class="message-reference-chip message-agent-tag"
                 icon={<AgentAvatar agent={liveAgent(agent)} />}
                 onClick={() => props.onSelectAgent(agent.id)}
+              />
+            );
+          }
+          if (part.memberName) {
+            return (
+              <ReferenceChip
+                class="message-reference-chip"
+                kind="member"
+                name={part.memberName}
+                icon={<UsersRound />}
               />
             );
           }
@@ -379,6 +389,7 @@ export function MessageLink(props: {
 /** A part that shows its source text as it is, so its length counts body characters. */
 function plainTextPart(part: RichMessagePart): boolean {
   return !(
+    part.memberName ||
     part.agent ||
     part.skill ||
     part.mcpName ||
@@ -394,6 +405,7 @@ function plainTextPart(part: RichMessagePart): boolean {
 interface RichMessagePart {
   text: string;
   agent?: ComposerAgent | undefined;
+  memberName?: string;
   skill?: ComposerSkill;
   /**
    * An MCP server tag carries the name it was written with, and nothing looks it up. A message is a
@@ -429,6 +441,7 @@ function richMessageParts(
   const parts: RichMessagePart[] = [];
   for (const taggedReference of semanticTagParts(body, agents, skills)) {
     if (
+      taggedReference.memberName ||
       taggedReference.agent ||
       taggedReference.skill ||
       taggedReference.mcpName ||
@@ -468,7 +481,9 @@ function semanticTagParts(body: string, agents: ComposerAgent[], skills: Compose
   let cursor = 0;
   for (const reference of references) {
     if (reference.start > cursor) parts.push({ text: body.slice(cursor, reference.start) });
-    if (reference.kind === "agent") {
+    if (reference.kind === "member") {
+      parts.push({ text: reference.name, memberName: reference.name });
+    } else if (reference.kind === "agent") {
       const agent = agents.find((candidate) => candidate.id === reference.id);
       parts.push(agent ? { text: agent.name, agent } : { text: reference.name, unavailableKind: "agent" });
     } else if (reference.kind === "mcp") {

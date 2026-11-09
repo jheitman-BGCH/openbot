@@ -42,8 +42,8 @@
  * - `license-member-limits`: a new Starter hosted server takes 1 member (the owner), and a new Standard
  *   server takes 5. A server made before these limits (`legacy_member_limits = 1`) takes 3 on Starter and
  *   10 on Standard.
- * - `license-self-hosted-limit`: a server with no plan takes 3 members with no license, the users of a
- *   Team license while it is active, and 3 again when it ends. Members who are active stay. A custom limit
+ * - `license-self-hosted-limit`: a server with no plan uses the protocol capacity with no license, the users of a
+ *   Team license while it is active, and the protocol capacity again when it ends. Active members stay. A custom limit
  *   above the license users shows the license users, and a plan from before the license gives way to more
  *   license users.
  *
@@ -3109,12 +3109,11 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const freeLimit = await hostMemberLimit(account, hostId);
     record(
       "license-self-hosted-limit",
-      `no license: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, 2 members join next to the owner, and the third gets 409 member_limit_reached`,
+      `no license: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, and 3 members join next to the owner`,
       freeLimit === DEFAULT_TEAM_MEMBER_LIMIT &&
         free[0]?.status === 200 &&
         free[1]?.status === 200 &&
-        free[2]?.status === 409 &&
-        free[2].code === "member_limit_reached",
+        free[2]?.status === 200,
       { memberLimit: freeLimit, joins: free.map(outcome) },
     );
 
@@ -3125,15 +3124,14 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       return limit === 5 ? limit : null;
     });
     const licensed = [];
-    for (const key of ["c", "d", "e"]) licensed.push(await account.memberJoins(key, 0));
+    for (const key of ["d", "e"]) licensed.push(await account.memberJoins(key, 0));
     record(
       "license-self-hosted-limit",
-      "a Team license of 5: the host list shows 5, 2 more members join, and the next gets 409 license_users_full",
+      "a Team license of 5: the host list shows 5, one more member joins, and the next gets 409 license_users_full",
       licensedLimit === 5 &&
         licensed[0]?.status === 200 &&
-        licensed[1]?.status === 200 &&
-        licensed[2]?.status === 409 &&
-        licensed[2].code === "license_users_full",
+        licensed[1]?.status === 409 &&
+        licensed[1].code === "license_users_full",
       { memberLimit: licensedLimit, joins: licensed.map(outcome) },
     );
 
@@ -3203,13 +3201,11 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     });
     record(
       "license-self-hosted-limit",
-      `the license ends: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, the 6 active members stay, and a join and a reactivation get 409 member_limit_reached`,
+      `the license ends: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, the 6 active members stay, and a join and a reactivation succeed`,
       endedLimit === DEFAULT_TEAM_MEMBER_LIMIT &&
         counted?.active === 6 &&
-        late.status === 409 &&
-        late.code === "member_limit_reached" &&
-        reactivated.status === 409 &&
-        reactivated.code === "member_limit_reached",
+        late.status === 200 &&
+        reactivated.status === 200,
       { memberLimit: endedLimit, active: counted?.active, join: outcome(late), reactivation: outcome(reactivated) },
     );
   },

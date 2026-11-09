@@ -503,4 +503,6 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.vaultRequest.skipped": "Not added to Vault",
   "mobile.chat.vaultRequest.gone": "This request is no longer open.",
   "mobile.chat.vaultRequest.notAllowed": "Only the server owner or an admin can add an item to the Vault.",
+  "mobile.chat.composer.people": "People",
+  "mobile.chat.composer.mentionPerson": "Mention {name}",
 });

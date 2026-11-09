@@ -26,6 +26,24 @@ library, so the phone composes its layout with the two widget keys and the App G
 state carry an HMAC signature, which the app checks with the key of the host that the action goes
 to, so one host cannot sign an action for another.
 
+## Member mentions
+
+The `@` picker offers active people from the host's presence list, including people who are offline.
+A member tag is `@[name](member:<host member id>)`. It keeps a separate identity from an agent tag,
+also when the names match. Draft edits and message history keep that identity.
+
+A channel message addressed only to people is stored without starting agent work. An opening agent
+tag still addresses that agent, including after a person tag. Tags later in the text notify the named
+people without changing the agent assignment.
+
+After a new message commits, the host emits one `member-mentioned` event per named person. It skips
+the sender and repeated tags. The optional `member-mentions-v1` capability is for protocol 9 peers.
+The event carries only member, message, agent, channel, and thread IDs. The Team API and phone push
+service check the recipient and their current access before sending it. A removed or disabled member
+gets no notice. Desktop, web, and phone use fixed local text, the member's notification levels, and
+mute settings. Both `all` and `needs-me` allow mentions. Phone notices use the existing encrypted push
+path; an optional sealed `channelId` makes a tap open the channel on iOS and Android.
+
 ## iPhone notifications
 
 A host sends an iOS notification when an agent finishes a turn, stops with an error, cannot start a

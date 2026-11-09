@@ -1,4 +1,5 @@
 /**
+ * A `member` tag names a person by the host member id. It never addresses an agent.
  * What a tag in a message names. `mcp` is one of the host's MCP servers: a tag is a hint for the
  * model, in the same way a skill tag is, and it changes no tool the provider is given. `quote` is
  * text the user selected in a message of the same chat: its name is that text and its id is the
@@ -11,7 +12,7 @@
  * the name. Message bodies are stored as written, so an older app reading a newer message is a
  * real case, and it stays readable.
  */
-export type ChatTagKind = "agent" | "skill" | "mcp" | "quote" | "tab" | "thread";
+export type ChatTagKind = "agent" | "member" | "skill" | "mcp" | "quote" | "tab" | "thread";
 
 export interface ChatTagReference {
   kind: ChatTagKind;
@@ -21,7 +22,8 @@ export interface ChatTagReference {
   end: number;
 }
 
-const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote|tab|thread)(\+uri)?:([^)\r\n]+)\)/gu;
+const CHAT_TAG_REFERENCE_PATTERN =
+  /@\[([^\]\r\n]+)\]\((agent|member|skill|mcp|quote|tab|thread)(\+uri)?:([^)\r\n]+)\)/gu;
 
 /*
  * Quoted text is any text, and Markdown reads the marker as a link. A bracket, a backslash, a
@@ -95,7 +97,8 @@ export function referenceName(name: string): string {
 
 export function serializeChatTagReference(kind: ChatTagKind, name: string, id: string): string {
   // A quote, a page title and a thread title are any text, so they get the strict rule.
-  const unsafeName = kind === "quote" || kind === "tab" || kind === "thread" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
+  const unsafeName =
+    kind === "member" || kind === "quote" || kind === "tab" || kind === "thread" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
   if (name && id && !unsafeName.test(name) && !/[)\r\n]/u.test(id)) return `@[${name}](${kind}:${id})`;
   return `@[${encodeChatTagComponent(name)}](${kind}+uri:${encodeChatTagComponent(id)})`;
 }
@@ -126,22 +129,34 @@ const ADDRESS_SEPARATORS = /^(?:[\s,]|and\b|&|@everyone(?![\p{L}\p{N}_'’-]))*/
  * puts a quote where the caret is, often before the mention, so "<quote> @A why?" still asks A.
  * `end` is where the address and the quotes in it stop.
  */
-export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean; end: number } {
+export function leadingAddress(value: string): {
+  mentions: ChatTagReference[];
+  members: ChatTagReference[];
+  everyone: boolean;
+  end: number;
+} {
   const mentions: ChatTagReference[] = [];
+  const members: ChatTagReference[] = [];
   let end = 0;
   let everyone = false;
   for (const reference of [...chatTagReferences(value), undefined]) {
     const gap = value.slice(end, reference?.start);
     const separators = ADDRESS_SEPARATORS.exec(gap)?.[0] ?? "";
     everyone ||= separators.toLowerCase().includes(EVERYONE_MENTION);
-    if ((reference?.kind !== "agent" && reference?.kind !== "quote") || separators.length !== gap.length) break;
+    if (
+      (reference?.kind !== "agent" && reference?.kind !== "member" && reference?.kind !== "quote") ||
+      separators.length !== gap.length
+    )
+      break;
     if (reference.kind === "agent") mentions.push(reference);
+    if (reference.kind === "member") members.push(reference);
     end = reference.end;
   }
-  return { mentions, everyone, end };
+  return { mentions, members, everyone, end };
 }
 
 function chatTagKind(value: string | undefined): ChatTagKind {
+  if (value === "member") return value;
   if (value === "skill" || value === "mcp" || value === "quote" || value === "tab" || value === "thread") return value;
   return "agent";
 }
@@ -224,8 +239,8 @@ function fileQuoteHeading(file: FileQuoteTarget): string {
 }
 
 /** What the provider reads in place of a marker. A name alone would not say what it names. */
-function expandedChatTag(kind: "agent" | "skill" | "mcp", name: string): string {
-  if (kind === "agent") return `@${name}`;
+function expandedChatTag(kind: "agent" | "member" | "skill" | "mcp", name: string): string {
+  if (kind === "agent" || kind === "member") return `@${name}`;
   return kind === "mcp" ? `${name} (MCP server)` : `${name} (skill)`;
 }
 

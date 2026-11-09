@@ -30,6 +30,7 @@ import {
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { MemberMentionEvent } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
@@ -62,6 +63,7 @@ import { ChannelMemoryStore } from "./channel-memory-store";
 import { CHANNEL_REPLY_ID_PREFIX, channelReplyExpectedResult, checkChannelReply, isReplyTask } from "./channel-replies";
 import { type ChannelAssignment, type ChannelContext, ChannelStore } from "./channel-store";
 import type { DeliveryContext, MailboxStore } from "./mailbox-store";
+import { memberMentionEvents } from "./member-mentions";
 import { type MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { OpenBotDatabase } from "./openbot-database";
 import { extractJsonObject, StructuredOutputError } from "./structured-output";
@@ -111,6 +113,7 @@ export interface ChannelHooks {
     text: string,
   ): Effect.Effect<"accepted" | "rejected" | "uncertain", ChannelOperationError>;
   changed(channelId: string, revision: number): void;
+  mentioned?(event: MemberMentionEvent): void;
   /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
   queueHoldChanged?(): void;
   /** A memory is not part of the channel revision, so a tool write needs its own notification. */
@@ -871,6 +874,15 @@ export class ChannelService {
         const open = allTasks.filter((task) => !terminal(task));
         const eligible = this.eligibleMembers(current);
         const recipients = this.#recipients(eligible, text, command.recipientAgentId);
+        const address = leadingAddress(text);
+        // A message addressed only to people stays in the channel without starting agent work.
+        if (address.members.length > 0 && !address.everyone && recipients.length === 0) {
+          const message = this.message(current.id, null, { kind: "member", ...actor }, text, id);
+          message.message.replyToMessageId = command.replyToMessageId;
+          if (committed) message.message.attachments = committed.attachments;
+          const result = yield* channelSync(() => this.store.update(current, { messages: [message] }, operationId));
+          return { current, continued: [], affected: [], resumed: [], message, result };
+        }
         const continues =
           /^(?:also|instead|actually|please change|change that|correction|continue|resume|go on|keep going|yes|no|use that|make it)\b/iu.test(
             text.trim(),
@@ -992,6 +1004,13 @@ export class ChannelService {
       );
       const { current, continued, affected, resumed, message, result } = stored;
       this.publish(current.id);
+      for (const event of memberMentionEvents(message.message.text, actor.id, {
+        messageId: message.id,
+        agentId: null,
+        channelId: current.id,
+        threadId: null,
+      }))
+        this.hooks.mentioned?.(event);
       yield* this.interruptTasks(
         current.id,
         affected.filter((item) => !continued.some((entry) => entry.id === item.id)),

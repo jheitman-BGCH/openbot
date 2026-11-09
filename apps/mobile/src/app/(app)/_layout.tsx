@@ -126,7 +126,15 @@ function AuthenticatedStack() {
    * at a cold start comes before the server connects, so it waits a short time for the channel list.
    */
   const openFromNotification = useCallback(
-    ({ agentId, serverId, threadId }: NotificationTarget) => {
+    ({ agentId, serverId, threadId, channelId }: NotificationTarget) => {
+      if (serverId && channelId) {
+        whenUnlocked(() => {
+          closeDrawer();
+          if (router.canDismiss()) router.dismissAll();
+          router.push({ pathname: "/channel/[channelId]", params: { channelId, serverId } });
+        });
+        return;
+      }
       if (!serverId || !threadId) {
         openFromOutside(agentId);
         return;

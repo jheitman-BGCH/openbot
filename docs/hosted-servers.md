@@ -311,12 +311,12 @@ a Claude subscription on a server, read [provider terms](provider-terms.md#claud
 The plan sets the number of active members, owner included: Starter 1, Standard 5 and Pro 10
 (`BILLING_PLANS`). A host with no plan, such as a self-hosted server, takes the users of its owner's
 license (`ownerLicenseForHost`): Starter 1, Team 2 to 10. Only a license that is `active`, `trialing`, or
-`past_due` until the end of its period gives these seats. A host with no plan and no such license has 3
-(`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the limit in this order: a `server_member_limits` row,
+`past_due` until the end of its period gives these seats. A host with no plan and no such license uses
+the protocol capacity of 100 stored members (`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the limit in this order: a `server_member_limits` row,
 a hosted plan, the license, the default. A self-hosted host can keep a plan from before the license; it
 takes the larger of that plan and the license users. When an account has two open licenses, an
 entitled one comes first. When the limit comes from the license, a full server refuses a
-join with `409 license_users_full`. When a license ends, its servers go back to 3; members who are
+join with `409 license_users_full`. When a license ends, its servers go back to the protocol capacity; members who are
 active stay. Any open license, also an `unpaid` one, refuses a join after its users, so the host list
 shows the lower of the limit and those users. When a license opens or closes, changes its users, or
 starts or stops giving them, the Worker sends `account-servers-changed` to each active member of the
@@ -352,10 +352,10 @@ self-hosted host that has a plan.
 - A lower limit after a plan change, a plan end or a custom limit removes no one. Active members
   keep their seats. A new join or a reactivation waits for a free seat.
 - The host list (`GET /v2/remote/hosts/`) gives `memberLimit` for each host. The desktop, web and
-  mobile member screens show it. They use 3 when an older Worker sends no limit.
+  mobile member screens show it. They use the protocol capacity when an older Worker sends no limit.
 - After each subscription sync, the Worker sends `account-servers-changed` to each active member,
   so their devices read the host list, and the new limit, again.
-- A host that is not on an account keeps 3 in its own store (`src/main/team-store.ts`). It has no plan.
+- A host that is not on an account uses the protocol capacity in its own store (`src/main/team-store.ts`). It has no plan.
 
 ## Configure the test Worker
 

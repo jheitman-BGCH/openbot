@@ -7,6 +7,7 @@ import type {
   DraftAttachment,
   InstalledSkill,
   QueueDelivery,
+  TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
@@ -157,6 +158,7 @@ export interface AgentThreadViewProps {
   limit: number;
   agent: AgentProfile;
   agents: AgentProfile[];
+  members?: TeamMemberSummary[] | undefined;
   messages: readonly AgentMessage[];
   /** The agent's skills, for the `$` picker and the skill tags in messages. */
   skills?: InstalledSkill[] | undefined;
@@ -946,6 +948,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}
+              members={props.members}
               skills={props.skills}
               skillsLoadFailed={props.skillsLoadFailed}
               mcpServers={props.mcpServers}

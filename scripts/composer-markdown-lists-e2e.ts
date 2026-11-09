@@ -30,6 +30,7 @@ interface Report {
   deliberateGap?: CaseResult;
   desktopReferences?: CaseResult;
   mobileMention?: CaseResult;
+  memberMention?: { stored: string; edited: string };
   passed: boolean;
 }
 
@@ -151,6 +152,21 @@ try {
   report.mobileMention = { before: mobileSource, after: mobileAfter };
   assert.equal(mobileAfter, `1. one\n2. two\n3. \n4. ${mention}\n5. four`);
 
+  await page.goto(`${storybook}/iframe.html?id=conversation-composereditor--with-member-mentions&viewMode=story`);
+  const memberEditor = page.getByRole("textbox", { name: "Message Chief" });
+  await memberEditor.waitFor({ timeout: 60_000 });
+  await memberEditor.fill("@ada");
+  await page.getByRole("option", { name: "Ada Person", exact: true }).waitFor();
+  await memberEditor.press("Enter");
+  const draft = page.getByLabel("Draft text");
+  const stored = await draft.textContent();
+  assert.equal(stored, `${serializeChatTagReference("member", "Ada", "person-ada")} `);
+  await memberEditor.press("End");
+  await memberEditor.pressSequentially("please review");
+  const edited = await draft.textContent();
+  assert.equal(edited, `${stored}please review`);
+  report.memberMention = { stored, edited };
+  assert.equal(mentionDraft(edited).text, "@Ada please review");
   report.passed = true;
   writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

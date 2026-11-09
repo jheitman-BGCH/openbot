@@ -15,6 +15,7 @@ import {
   TEAM_SVG_ATTACHMENTS_CAPABILITY,
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { MEMBER_MENTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/member-mentions-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
 import { Button, Input } from "@openbot/ui";
@@ -139,6 +140,12 @@ export function ConversationComposer() {
     agentProviderName,
     sideThreadOpen,
   } = useConversationViewScope();
+  const mentionMembers = () => {
+    const server = props.server;
+    if (server?.kind === "remote" && !server.compatibility?.capabilities.includes(MEMBER_MENTIONS_CAPABILITY))
+      return [];
+    return props.presence.members;
+  };
   const { t, format, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
     channel
@@ -702,6 +709,7 @@ export function ConversationComposer() {
             <ComposerEditor
               agentId={props.agent?.id}
               agents={props.mentionAgents ?? props.agents}
+              members={mentionMembers()}
               everyoneMention={Boolean(channel) && (props.mentionAgents ?? props.agents).length > 1}
               skills={installedSkills()}
               skillsLoadFailed={installedSkillsLoadFailed()}

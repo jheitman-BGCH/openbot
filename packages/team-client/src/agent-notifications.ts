@@ -91,6 +91,7 @@ const START_FAILED_CODE = "delivery_start_failed";
  */
 export function agentEventCanNotify(event: AgentEvent | TeamRealtimeEvent): boolean {
   switch (event.type) {
+    case "member-mentioned":
     case "prompt":
     case "approval":
     case "browser-takeover-requested":
@@ -127,7 +128,12 @@ export function notificationRequestKey(serverId: string, event: AgentEvent): str
 
 /** Whether the event waits for the user, so that the "needs-me" level keeps it. */
 export function agentEventNeedsUser(event: AgentEvent): boolean {
-  return event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested";
+  return (
+    event.type === "member-mentioned" ||
+    event.type === "prompt" ||
+    event.type === "approval" ||
+    event.type === "browser-takeover-requested"
+  );
 }
 
 /** The thread that an event waits on, or null when it is not a request. A channel can own that thread. */
@@ -142,6 +148,7 @@ export function agentEventRequestThread(event: AgentEvent): string | null {
 export function agentEventAgentId(event: AgentEvent): string | null {
   switch (event.type) {
     case "prompt":
+    case "member-mentioned":
     case "turn-completed":
     case "subagent-failed":
       return event.agentId;
@@ -184,6 +191,14 @@ export function notificationForAgentEvent(
   channel: AgentNotificationChannel | null = null,
 ): AgentNotificationContent | null {
   if (level === "nothing") return null;
+  if (event.type === "member-mentioned")
+    return {
+      title: translate("notification.mentioned.title"),
+      body: translate("notification.mentioned.body"),
+      agentId: event.agentId ?? "",
+      threadId: event.threadId,
+      ...(event.channelId ? { channelId: event.channelId } : {}),
+    };
   const subject = notificationSubject(event, level, translate, preview);
   if (!subject) return null;
   const agent = agents.find((candidate) => candidate.id === subject.agentId);

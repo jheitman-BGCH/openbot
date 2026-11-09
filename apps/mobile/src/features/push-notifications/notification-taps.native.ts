@@ -57,11 +57,13 @@ function notificationTarget(notification: Notifications.Notification): Notificat
   // A notification that the extension could not open has no data.
   const data = notification.request.content.data;
   const agentId = data?.agentId;
-  if (!isString(agentId) || !agentId) return null;
+  const channelId = data?.channelId;
+  if ((!isString(agentId) || !agentId) && (!isString(channelId) || !channelId)) return null;
   const serverId = data?.serverId;
   const threadId = data?.threadId;
   return {
-    agentId,
+    agentId: isString(agentId) ? agentId : "",
+    channelId: isString(channelId) && channelId ? channelId : null,
     serverId: isString(serverId) && serverId ? serverId : null,
     threadId: isString(threadId) && threadId ? threadId : null,
   };

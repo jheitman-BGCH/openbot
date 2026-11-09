@@ -50,7 +50,10 @@ import {
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { MemberMentionEvent } from "@openbot/contracts/team-protocol/member-mentions-v1";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Option, Result, Semaphore } from "effect";
@@ -449,6 +452,8 @@ export class HostService extends EventEmitter<HostEvents> {
             hiddenAgentIds: (protocol, capabilities, memberId) =>
               this.#api.hiddenAgentIds(protocol, capabilities, memberId),
             randomBytes: (size) => new Uint8Array(randomBytes(size)),
+            canReceiveMention: (event, memberId, protocol, capabilities) =>
+              this.#api.canReceiveMemberMention(event, memberId, protocol, capabilities),
             memberActive: (memberId) => {
               const member = options.store.getMember(memberId);
               return member !== null && !member.disabled;
@@ -2179,6 +2184,15 @@ export class HostService extends EventEmitter<HostEvents> {
     const store = this.#options.channels?.store;
     const channelId = store?.channelForThread(threadId);
     return store && channelId ? { id: channelId, name: store.get(channelId).name } : null;
+  }
+
+  /** Whether the signed-in host user can receive this mention. */
+  memberMentionForCurrentUser(event: MemberMentionEvent): boolean {
+    const memberId = this.#findCurrentMemberId();
+    return (
+      memberId !== null &&
+      this.#api.canReceiveMemberMention(event, memberId, TEAM_PROTOCOL_V9, new Set(TEAM_CURRENT_CAPABILITIES))
+    );
   }
 
   /**

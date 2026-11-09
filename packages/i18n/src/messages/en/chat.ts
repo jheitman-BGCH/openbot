@@ -443,4 +443,6 @@ export const messages = defineMessages("chat", {
   "chat.feedbackSent.badge": "Sent",
   "chat.feedbackSent.body": "The OpenBot team will read it and take care of it 💜",
   "chat.feedbackSent.openNamed": "Open issue #{number} on GitHub",
+  "chat.reference.kind.member": "Person",
+  "chat.reference.open.member": "Open person {name}",
 });

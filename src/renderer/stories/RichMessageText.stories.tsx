@@ -283,3 +283,9 @@ export const ChipsInNarrowReply: Story = {
     </div>
   ),
 };
+
+export const MemberMentions: Story = {
+  args: {
+    body: `${serializeChatTagReference("member", "Research", "person-research")} please review this with ${serializeChatTagReference("agent", "Research", "research")}.`,
+  },
+};

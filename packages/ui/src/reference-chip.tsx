@@ -13,6 +13,7 @@ export const referenceChipClasses = {
 /** What a reader hears before the name, so a chip is not just a word in the sentence. */
 const CHIP_KIND_LABELS = {
   agent: "chat.reference.kind.agent",
+  member: "chat.reference.kind.member",
   mcp: "chat.reference.kind.mcp",
   plugin: "chat.reference.kind.plugin",
   quote: "chat.reference.kind.quote",
@@ -23,6 +24,7 @@ const CHIP_KIND_LABELS = {
 
 const CHIP_OPEN_LABELS = {
   agent: "chat.reference.open.agent",
+  member: "chat.reference.open.member",
   mcp: "chat.reference.open.mcp",
   plugin: "chat.reference.open.plugin",
   quote: "chat.reference.open.quote",
@@ -31,7 +33,7 @@ const CHIP_OPEN_LABELS = {
   thread: "chat.reference.open.thread",
 } as const satisfies Record<ReferenceChipKind, string>;
 
-export type ReferenceChipKind = "agent" | "mcp" | "plugin" | "quote" | "skill" | "tab" | "thread";
+export type ReferenceChipKind = "agent" | "member" | "mcp" | "plugin" | "quote" | "skill" | "tab" | "thread";
 
 /** Shared appearance for rendered references and contenteditable tokens. */
 export function ReferenceChip(props: {
