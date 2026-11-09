@@ -1,0 +1,120 @@
+name: Fork desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - t3/remove-invite-member-limit
+      - fork/**
+    paths:
+      - .github/workflows/fork-desktop.yml
+      - electron-builder.fork.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'jheitman-BGCH/openbot'
+    name: Build ${{ matrix.label }} installer
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+            label: Mac Apple silicon
+            artifact: mac-apple-silicon
+            app: dist/mac-arm64/OpenBot.app/Contents/Resources
+          - os: macos-15-intel
+            arch: x64
+            label: Mac Intel
+            artifact: mac-intel
+            app: dist/mac/OpenBot.app/Contents/Resources
+          - os: windows-2022
+            arch: x64
+            label: Windows
+            artifact: windows
+            app: dist/win-unpacked/resources
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun and install dependencies
+        uses: ./.github/actions/setup-bun
+
+      - name: Install pinned remote desktop runtime
+        run: bun run install:remote-desktop-runtime
+
+      - name: Build Mac installer
+        if: runner.os == 'macOS'
+        run: bun run dist:mac --config electron-builder.fork.yml --${{ matrix.arch }} --publish never
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        run: bun run dist:win --config electron-builder.fork.yml
+
+      - name: Check Mac application and launch
+        if: runner.os == 'macOS'
+        run: bun scripts/verify-macos-package.ts
+
+      - name: Check Windows application and launch
+        if: runner.os == 'Windows'
+        run: bun scripts/verify-windows-package.ts --require-update-metadata
+
+      - name: Check fork update feed and write download checksums
+        shell: bash
+        env:
+          PACKAGED_RESOURCES: ${{ matrix.app }}
+        run: |
+          bun -e '
+            const { parse } = await import("yaml");
+            const { readdir } = await import("node:fs/promises");
+            const metadata = parse(await Bun.file(`${process.env.PACKAGED_RESOURCES}/app-update.yml`).text());
+            if (metadata.provider !== "github" || metadata.owner !== "jheitman-BGCH" || metadata.repo !== "openbot") {
+              throw new Error("The packaged updater must use the fork repository.");
+            }
+            const extension = process.platform === "darwin" ? ".dmg" : ".exe";
+            const files = (await readdir("dist")).filter(name => name.endsWith(extension));
+            if (files.length !== 1) throw new Error(`Expected one ${extension} installer.`);
+            const checksums = [];
+            for (const name of files) {
+              const data = await Bun.file(`dist/${name}`).arrayBuffer();
+              checksums.push(`${new Bun.CryptoHasher("sha256").update(data).digest("hex")}  ${name}`);
+            }
+            await Bun.write("dist/SHA256SUMS.txt", `${checksums.join("\n")}\n`);
+          '
+
+      - name: Save installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openbot-${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/SHA256SUMS.txt
+
+      - name: Write build summary
+        shell: bash
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          {
+            echo "## $LABEL installer"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Download the installer from this run's artifacts."
+            echo "This build is unsigned. Check docs/FORK-DOWNLOADS.md before distribution."
+          } >> "$GITHUB_STEP_SUMMARY"

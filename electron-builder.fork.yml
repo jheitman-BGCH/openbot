@@ -1,0 +1,9 @@
+extends: ./electron-builder.yml
+# Keep fork installs on the fork's update feed.
+publish:
+  provider: github
+  owner: jheitman-BGCH
+  repo: openbot
+mac:
+  identity: null
+  notarize: false

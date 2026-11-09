@@ -41,6 +41,9 @@ visited pages use the network, and installed plugins may connect to their own se
 
 ## Install
 
+For this fork's Mac and Windows builds, see [Fork downloads](docs/FORK-DOWNLOADS.md).
+The platform links below point to releases of the original project.
+
 OpenBot supports macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64 systems, and x64
 or arm64 Linux as an AppImage.
 
