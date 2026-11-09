@@ -45,6 +45,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       GITHUB_TOKEN: ${{ github.token }}
+      OPENBOT_RELEASE_REPOSITORY: jheitman-BGCH/openbot
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,6 +57,9 @@ jobs:
 
       - name: Install pinned remote desktop runtime
         run: bun run install:remote-desktop-runtime
+
+      - name: Check fork release discovery
+        run: bun scripts/fork-release-feed-e2e.ts
 
       - name: Build Mac installer
         if: runner.os == 'macOS'
@@ -72,6 +76,14 @@ jobs:
       - name: Check Windows application and launch
         if: runner.os == 'Windows'
         run: bun scripts/verify-windows-package.ts --require-update-metadata
+
+      - name: Check Mac download sizes and update artifacts
+        if: runner.os == 'macOS'
+        run: bun scripts/verify-update-artifacts.ts macos
+
+      - name: Check Windows download size and update artifacts
+        if: runner.os == 'Windows'
+        run: bun scripts/verify-update-artifacts.ts windows
 
       - name: Check fork update feed and write download checksums
         shell: bash

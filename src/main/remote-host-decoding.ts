@@ -1,4 +1,4 @@
-import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contracts/ipc";
+import { decodeHostReleaseStatus, type HostReleaseStatus, type HostSkillLearning } from "@openbot/contracts/ipc";
 // What the Team API client will accept from a remote host. `packages/contracts/src/ipc-decoding.ts`
 // supplies the primitives; this family says which shapes survive them.
 //
@@ -18,7 +18,7 @@ import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contra
 // a browser preview that is not a bounded JPEG data URL) are covered where they are reached.
 
 import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 
 export type ResponseDecoder<T> = (value: unknown) => T;
 
@@ -33,4 +33,16 @@ export const decodeComputerActivityReply = (value: unknown): boolean => isDynami
 /** The web client uses the same remote boundary; the preload has its own decoder. */
 export function decodeHostReleaseStatusFromHost(value: unknown): HostReleaseStatus {
   return decodeHostReleaseStatus(value);
+}
+
+/** The host defines its modes and choices; a newer mode remains readable. */
+export function decodeHostSkillLearningFromHost(value: unknown): HostSkillLearning {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.mode) ||
+    !Array.isArray(value.choices) ||
+    !value.choices.every(isString)
+  )
+    throw new Error("Invalid skill learning setting.");
+  return { mode: value.mode, choices: [...value.choices] };
 }

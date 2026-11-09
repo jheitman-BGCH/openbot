@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { decodeMarketplaceAgentDetail, decodeMarketplaceAgentPage } from "./skills-decoding";
+import {
+  decodeHostSkillLearningFromMain,
+  decodeMarketplaceAgentDetail,
+  decodeMarketplaceAgentPage,
+  decodeSaveSkillSuggestionResultFromMain,
+} from "./skills-decoding";
 
 const SUMMARY = {
   category: "coding",
@@ -22,6 +27,35 @@ const SUMMARY = {
 };
 
 const DETAIL = { ...SUMMARY, versionId: "av-1", skills: [], routines: [] };
+
+describe("Skill learning answers from main", () => {
+  it("keeps the choices of a host with a newer mode", () => {
+    const answer = { mode: "review-first", choices: ["review-first", "off"] };
+    expect(decodeHostSkillLearningFromMain(answer)).toEqual(answer);
+  });
+
+  it.each([
+    null,
+    [],
+    {},
+    { mode: 1, choices: ["off"] },
+    { mode: "off", choices: "off" },
+    { mode: "off", choices: ["off", null] },
+  ])("refuses a malformed skill learning setting", (value) => {
+    expect(() => decodeHostSkillLearningFromMain(value)).toThrow("Invalid skill learning setting.");
+  });
+
+  it.each([true, false])("keeps the saved result %s", (saved) => {
+    expect(decodeSaveSkillSuggestionResultFromMain({ saved })).toEqual({ saved });
+  });
+
+  it.each([null, [], {}, { saved: "true" }, { saved: 1 }, { saved: null }])(
+    "refuses a malformed save result",
+    (value) => {
+      expect(() => decodeSaveSkillSuggestionResultFromMain(value)).toThrow("Invalid skill suggestion result.");
+    },
+  );
+});
 
 // The shield, the Verified filter and the trust line read these flags. A Worker before them sends
 // none, and the agent is then a public one that OpenBot reviewed.

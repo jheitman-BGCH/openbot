@@ -5,9 +5,16 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { lazyLanguageCatalogs } from "./packages/i18n/src/vite-plugin";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
+const releaseRepository = process.env.OPENBOT_RELEASE_REPOSITORY ?? "nightly-labs/openbot";
+if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(releaseRepository)) {
+  throw new Error("OPENBOT_RELEASE_REPOSITORY must be a GitHub owner/repository.");
+}
 
 export default defineConfig({
   main: {
+    define: {
+      "process.env.OPENBOT_RELEASE_REPOSITORY": JSON.stringify(releaseRepository),
+    },
     // Workspace sources ship as TypeScript and must be bundled for the packaged app.
     plugins: [
       externalizeDepsPlugin({

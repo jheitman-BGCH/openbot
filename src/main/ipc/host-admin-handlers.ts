@@ -19,7 +19,6 @@ import {
   decodeHostAgentMemoryLimit,
   decodeHostMemoryReview,
   decodeHostPersonality,
-  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
@@ -87,7 +86,12 @@ import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
-import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
+import {
+  acceptEmpty,
+  decodeHostReleaseStatusFromHost,
+  decodeHostSkillLearningFromHost,
+  type ResponseDecoder,
+} from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { ServerAuditStore } from "../server-audit-store";
 import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
@@ -187,7 +191,9 @@ export function hostAdminIpcHandlers({
   function remoteSkillLearning(serverId: string, route: string, body: { mode?: string }) {
     if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY))
       throw new Error(sourceText("error.team.skillLearningUnsupported"));
-    return runCauseEffect(remoteServers.request(serverId, route, decodeHostSkillLearning, { method: "POST", body }));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeHostSkillLearningFromHost, { method: "POST", body }),
+    );
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))

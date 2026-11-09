@@ -42,7 +42,6 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   decodeSaveAgentProfileResult,
-  decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
   isAgentModelOption,
   LOCAL_SERVER_ID,
@@ -144,6 +143,7 @@ import {
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
   decodeRemoteTaskReadStates,
+  decodeSaveSkillSuggestionResultFromHost,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
 } from "../remote-agent-decoding";
@@ -658,7 +658,7 @@ export function agentIpcHandlers({
           // An older host has no route: the card then sends the user's yes to the agent.
           if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY)) return { saved: false };
           return runCauseEffect(
-            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResult, {
+            remoteServers.request(serverId, SKILL_LEARNING_ROUTES.save, decodeSaveSkillSuggestionResultFromHost, {
               method: "POST",
               body: { agentId: input.agentId, messageId: input.messageId },
               timeoutMs: 150_000,

@@ -41,6 +41,7 @@ import type {
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  SaveSkillSuggestionResult,
   SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import {
@@ -87,6 +88,13 @@ export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapsho
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
+
+/** Whether the host saved the skill question. No other fields reach the caller. */
+export function decodeSaveSkillSuggestionResultFromHost(value: unknown): SaveSkillSuggestionResult {
+  if (!isDynamicRecord(value) || !isBoolean(value.saved)) throw new Error("Invalid skill suggestion result.");
+  return { saved: value.saved };
+}
+
 export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
   return decodeTaskReadStates(decodeRecord(value, "remote thread reads").reads);
 }

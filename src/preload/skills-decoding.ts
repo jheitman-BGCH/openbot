@@ -15,6 +15,7 @@ import {
   type AgentTemplatePreview,
   type AgentTemplatePublication,
   type AvatarImageInput,
+  type HostSkillLearning,
   INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   type InstallMarketplaceAgentResult,
@@ -31,6 +32,7 @@ import {
   type MarketplaceAgentSummary,
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
+  type SaveSkillSuggestionResult,
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
@@ -45,6 +47,24 @@ import {
 } from "@openbot/contracts/ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeAgent } from "./agent-decoding";
+
+/** The setting main sends, with the choices of the selected host, including newer modes. */
+export function decodeHostSkillLearningFromMain(value: unknown): HostSkillLearning {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.mode) ||
+    !Array.isArray(value.choices) ||
+    !value.choices.every(isString)
+  )
+    throw new Error("Invalid skill learning setting.");
+  return { mode: value.mode, choices: [...value.choices] };
+}
+
+/** Whether main saved the skill question. The renderer can send a reply when it did not. */
+export function decodeSaveSkillSuggestionResultFromMain(value: unknown): SaveSkillSuggestionResult {
+  if (!isDynamicRecord(value) || !isBoolean(value.saved)) throw new Error("Invalid skill suggestion result.");
+  return { saved: value.saved };
+}
 
 function decodeSkillSummary(value: unknown) {
   const item = decodeRecord(value, "marketplace skill");

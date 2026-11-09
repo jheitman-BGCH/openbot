@@ -6,6 +6,9 @@ import { isValidSemver } from "./update-service";
 
 class ReleaseCheckFailed extends Schema.TaggedError<ReleaseCheckFailed>()("ReleaseCheckFailed", {}) {}
 
+// The build fixes this value so installed forks use their own release discovery feed.
+const RELEASE_REPOSITORY = process.env.OPENBOT_RELEASE_REPOSITORY ?? "nightly-labs/openbot";
+
 const ReleaseManifest = Schema.Struct({
   version: Schema.String.check(Schema.isMaxLength(64), Schema.isPattern(/^\d+\.\d+\.\d+$/u)),
   files: Schema.Array(Schema.Struct({ url: Schema.String })),
@@ -128,7 +131,7 @@ export class HostReleaseService {
 
 /** The version of the latest published release for `target`. Rejects on any fault of the feed. */
 async function fetchLatestRelease(target: ReleaseTarget, request: typeof fetch, signal: AbortSignal): Promise<string> {
-  const response = await request(`https://github.com/nightly-labs/openbot/releases/latest/download/${target.feed}`, {
+  const response = await request(`https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/${target.feed}`, {
     signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
   });
   if (!response.ok || !response.body) {

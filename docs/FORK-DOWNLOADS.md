@@ -54,6 +54,8 @@ notarization, and Windows code signing. A signed fork configuration must use its
 identity and associated-domain entitlement. Do not use the original project's signing secrets.
 
 `electron-builder.fork.yml` sets the packaged update feed to this fork. It does not publish files.
+The workflow also sets `OPENBOT_RELEASE_REPOSITORY` at build time, so host release discovery uses
+the same fork. The installed application keeps this build value.
 The build workflow has read-only repository access and does not create tags, releases, or deploy
 services. Automatic Mac updates are not supported by these unsigned builds. A signed release must
 also publish and verify the update ZIP files and manifests before automatic updates are enabled.
